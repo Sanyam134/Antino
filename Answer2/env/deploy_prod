@@ -1,0 +1,5 @@
+
+# Prod deploy karne ke liye:
+cd infra/envs/prod
+terraform init
+terraform apply

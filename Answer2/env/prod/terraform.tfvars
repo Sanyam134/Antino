@@ -1,0 +1,10 @@
+env                     = "prod"
+vpc_cidr                = "10.1.0.0/16"
+ecs_cpu                 = "1024"
+ecs_memory              = "2048"
+desired_count           = 2
+db_instance_class       = "db.t3.medium"
+allocated_storage       = 100
+backup_retention_period = 14
+deletion_protection     = true
+db_password             = "ProdSuperSecurePassword987!"

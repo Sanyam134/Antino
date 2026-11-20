@@ -1,0 +1,101 @@
+name: Terraform Plan on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+      - '.github/workflows/terraform-plan.yml'
+
+permissions:
+  contents: read
+  pull-requests: write # PR par comment post karne ke liye zaroori
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan (${{ matrix.env }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+
+    defaults:
+      run:
+        working-directory: infra/envs/${{ matrix.env }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      # AWS Credentials (GitHub Repo Secrets se aayenge)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: infra
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend=false
+        # Note: Actual AWS S3 backend na hone par '-backend=false' plan-only validation ke liye best hai.
+        # Real AWS setup mein sirf 'terraform init' use karein.
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      # Plan output ko PR mein readable comment ki tarah post karna
+      - name: Post Plan to PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan (${{ matrix.env }}) ⚙️
+            * **Format Check:** \`${{ steps.fmt.outcome }}\`
+            * **Initialization:** \`${{ steps.init.outcome }}\`
+            * **Validation:** \`${{ steps.validate.outcome }}\`
+            * **Plan:** \`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan Output</summary>
+
+            \`\`\`hcl
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Fail if Terraform Plan Failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1

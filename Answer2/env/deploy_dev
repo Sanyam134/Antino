@@ -1,0 +1,5 @@
+# Dev deploy karne ke liye:
+cd infra/envs/dev
+terraform init
+terraform apply
+

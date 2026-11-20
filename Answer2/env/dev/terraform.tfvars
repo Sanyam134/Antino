@@ -1,0 +1,10 @@
+env                     = "dev"
+vpc_cidr                = "10.0.0.0/16"
+ecs_cpu                 = "256"
+ecs_memory              = "512"
+desired_count           = 1
+db_instance_class       = "db.t3.micro"
+allocated_storage       = 20
+backup_retention_period = 1
+deletion_protection     = false
+db_password             = "DevPassword123!"
